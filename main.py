@@ -1,43 +1,49 @@
-from flask import Flask, jsonify
-from bs4 import BeautifulSoup
+from flask import Flask, jsonify, request
 import requests
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
-# URL de la page du conjugueur
-url = 'https://leconjugueur.lefigaro.fr/conjugaison/verbe/faire.html'
-
-# Fonction pour analyser la page web et extraire les conjugaisons
-def extract_conjugations_from_url(url):
-    # Envoyer une requête GET pour récupérer la page HTML
-    response = requests.get(url)
+@app.route('/conjuguer', methods=['GET'])
+def conjuguer():
+    # Récupérer le verbe depuis les paramètres de requête
+    verbe = request.args.get('verbe', 'faire')
     
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.content, 'html.parser')
-        conjugations = []
+    # URL pour le scraping du verbe
+    url = f"https://leconjugueur.lefigaro.fr/conjugaison/verbe/{verbe}.html"
+    
+    # Récupérer le contenu de la page
+    response = requests.get(url)
+    if response.status_code != 200:
+        return jsonify({"error": "Erreur lors de la récupération des données"}), 500
+    
+    # Parser le contenu HTML
+    soup = BeautifulSoup(response.content, 'html.parser')
+    
+    # Extraire les modes et temps de conjugaison
+    modes_temps = []
+    for conjugBloc in soup.find_all('div', class_='conjugBloc'):
+        mode_temps = conjugBloc.find('div', class_='tempsBloc').text.strip()
+        conjugaison = []
 
-        # Trouver tous les blocs de conjugaison
-        conjug_blocks = soup.find_all('div', class_='tempsBloc')
+        # Trouver les lignes de conjugaison
+        for line in conjugBloc.find_all('b'):
+            text = line.text.strip()
+            # Ignorer les lignes vides ou incorrectes
+            if text and text != 'f':  # pour ignorer les tronçons comme 'f'
+                conjugaison.append(text)
 
-        for block in conjug_blocks:
-            mode_temps = block.text.strip()  # Le nom du mode et du temps (ex: "Présent", "Passé composé", etc.)
-            conjugaison_block = block.find_next('div')  # Trouver le bloc suivant qui contient les conjugaisons
-            conjugaisons = [line.strip() for line in conjugaison_block.stripped_strings]  # Extraire les conjugaisons
+        # Correction des morceaux fragmentés
+        conjugaison = ["".join(conjugaison[i:i+2]) for i in range(0, len(conjugaison), 2)]
 
-            conjugations.append({
+        # Ajouter au résultat final si la conjugaison est non vide
+        if conjugaison:
+            modes_temps.append({
                 "mode_temps": mode_temps,
-                "conjugaison": conjugaisons
+                "conjugaison": conjugaison
             })
-        return conjugations
-    else:
-        return {"error": "Impossible de récupérer les données."}
-
-@app.route('/')
-def home():
-    # Appeler la fonction pour extraire les conjugaisons
-    conjugations = extract_conjugations_from_url(url)
-    return jsonify(conjugations)
+    
+    return jsonify(modes_temps)
 
 if __name__ == '__main__':
-    # Lancer l'application Flask sur l'hôte 0.0.0.0 et le port 5000
     app.run(host='0.0.0.0', port=5000)
