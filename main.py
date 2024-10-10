@@ -7,7 +7,11 @@ app = Flask(__name__)
 @app.route('/conjuguer', methods=['GET'])
 def conjuguer():
     # Récupérer le verbe depuis les paramètres de requête
-    verbe = request.args.get('verbe', 'faire')
+    verbe = request.args.get('verbe')
+    
+    # Vérifier si un verbe a été fourni
+    if not verbe:
+        return jsonify({"error": "Veuillez fournir un verbe dans l'URL, par exemple ?verbe=faire"}), 400
     
     # URL pour le scraping du verbe
     url = f"https://leconjugueur.lefigaro.fr/conjugaison/verbe/{verbe}.html"
@@ -15,7 +19,7 @@ def conjuguer():
     # Récupérer le contenu de la page
     response = requests.get(url)
     if response.status_code != 200:
-        return jsonify({"error": "Erreur lors de la récupération des données"}), 500
+        return jsonify({"error": f"Impossible de récupérer les données pour le verbe '{verbe}'"}), 500
     
     # Parser le contenu HTML
     soup = BeautifulSoup(response.content, 'html.parser')
