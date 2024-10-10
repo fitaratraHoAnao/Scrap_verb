@@ -1,30 +1,43 @@
 from flask import Flask, jsonify
-import requests
 from bs4 import BeautifulSoup
+import requests
 
 app = Flask(__name__)
 
-@app.route('/modes', methods=['GET'])
-def get_modes():
-    url = "https://leconjugueur.lefigaro.fr/"
+# URL de la page du conjugueur
+url = 'https://leconjugueur.lefigaro.fr/conjugaison/verbe/faire.html'
+
+# Fonction pour analyser la page web et extraire les conjugaisons
+def extract_conjugations_from_url(url):
+    # Envoyer une requête GET pour récupérer la page HTML
     response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.content, 'html.parser')
+        conjugations = []
 
-    # Trouver tous les modes
-    modes = soup.find_all('h2', class_='modeBloc')
+        # Trouver tous les blocs de conjugaison
+        conjug_blocks = soup.find_all('div', class_='tempsBloc')
 
-    # Extraire les informations
-    liste_modes = []
-    for mode in modes:
-        nom_mode = mode.find('a').text.strip()
-        lien_mode = mode.find('a')['href']
-        liste_modes.append({
-            'nom': nom_mode,
-            'lien': lien_mode
-        })
+        for block in conjug_blocks:
+            mode_temps = block.text.strip()  # Le nom du mode et du temps (ex: "Présent", "Passé composé", etc.)
+            conjugaison_block = block.find_next('div')  # Trouver le bloc suivant qui contient les conjugaisons
+            conjugaisons = [line.strip() for line in conjugaison_block.stripped_strings]  # Extraire les conjugaisons
 
-    return jsonify(liste_modes)
+            conjugations.append({
+                "mode_temps": mode_temps,
+                "conjugaison": conjugaisons
+            })
+        return conjugations
+    else:
+        return {"error": "Impossible de récupérer les données."}
+
+@app.route('/')
+def home():
+    # Appeler la fonction pour extraire les conjugaisons
+    conjugations = extract_conjugations_from_url(url)
+    return jsonify(conjugations)
 
 if __name__ == '__main__':
+    # Lancer l'application Flask sur l'hôte 0.0.0.0 et le port 5000
     app.run(host='0.0.0.0', port=5000)
-    
