@@ -1,18 +1,29 @@
+from flask import Flask, jsonify
 import requests
 from bs4 import BeautifulSoup
 
-url = "https://leconjugueur.lefigaro.fr/"
-response = requests.get(url)
-soup = BeautifulSoup(response.text, 'html.parser')
+app = Flask(__name__)
 
-# Trouver tous les verbes
-# Cela dépend de la structure HTML du site, vous devrez peut-être ajuster les sélecteurs
-verbes = soup.find_all('a', class_='verbe')
+@app.route('/modes', methods=['GET'])
+def get_modes():
+    url = "https://leconjugueur.lefigaro.fr/"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
 
-# Extraire les verbes
-liste_verbes = [verbe.text for verbe in verbes]
+    # Trouver tous les modes
+    modes = soup.find_all('h2', class_='modeBloc')
 
-# Afficher la liste des verbes
-for verbe in liste_verbes:
-    print(verbe)
-  
+    # Extraire les informations
+    liste_modes = []
+    for mode in modes:
+        nom_mode = mode.find('a').text.strip()
+        lien_mode = mode.find('a')['href']
+        liste_modes.append({
+            'nom': nom_mode,
+            'lien': lien_mode
+        })
+
+    return jsonify(liste_modes)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
